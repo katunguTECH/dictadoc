@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { TEMPLATES, getTemplatesByCategory } from "@/lib/templates";
+import { exportDocumentAsPdf } from "@/lib/pdf/export";
 import type { LLMOutput } from "@/types/llm-output";
 
 const AudioRecorder = dynamic(() => import("./AudioRecorder"), {
@@ -55,6 +56,13 @@ export default function RecordPage() {
     }
   }
 
+  function handleDownload() {
+    if (!result) return;
+    const template = TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    exportDocumentAsPdf({ output: result, template });
+  }
+
   const transcriptReady = transcript.trim().length >= 20;
   const otherReady = !isOther || otherDescription.trim().length >= 3;
   const canGenerate = transcriptReady && otherReady && !loading && !transcribing;
@@ -74,27 +82,37 @@ export default function RecordPage() {
           {GROUPS.professional.length > 0 && (
             <optgroup label="Professional">
               {GROUPS.professional.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
               ))}
             </optgroup>
           )}
           {GROUPS["life-admin"].length > 0 && (
             <optgroup label="Life Admin">
               {GROUPS["life-admin"].map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
               ))}
             </optgroup>
           )}
           {GROUPS.creator.length > 0 && (
             <optgroup label="Creator">
-              {GROUPS.creator.filter((t) => t.id !== "other").map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
+              {GROUPS.creator
+                .filter((t) => t.id !== "other")
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
             </optgroup>
           )}
           <optgroup label="Not listed?">
             {TEMPLATES.filter((t) => t.id === "other").map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
             ))}
           </optgroup>
         </select>
@@ -157,15 +175,31 @@ export default function RecordPage() {
 
       {result && (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-gray-900">{result.metadata.title}</h2>
-          {result.metadata.subject && (
-            <p className="text-sm text-gray-600">{result.metadata.subject}</p>
-          )}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {result.metadata.title}
+              </h2>
+              {result.metadata.subject && (
+                <p className="text-sm text-gray-600">{result.metadata.subject}</p>
+              )}
+            </div>
+            <button
+              onClick={handleDownload}
+              className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              ⬇ Download PDF
+            </button>
+          </div>
           <div className="mt-4 space-y-4">
             {result.sections.map((section, i) => (
               <div key={i}>
-                <h3 className="text-sm font-semibold text-gray-800">{section.heading}</h3>
-                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{section.body}</p>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  {section.heading}
+                </h3>
+                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
+                  {section.body}
+                </p>
               </div>
             ))}
           </div>
