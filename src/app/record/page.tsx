@@ -1,8 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { TEMPLATES, getTemplatesByCategory } from "@/lib/templates";
 import type { LLMOutput } from "@/types/llm-output";
+
+const AudioRecorder = dynamic(() => import("./AudioRecorder"), {
+  ssr: false,
+  loading: () => <p className="text-sm text-gray-500">Loading recorder...</p>,
+});
 
 type GenerateResponse =
   | { success: true; data: LLMOutput }
@@ -17,6 +23,7 @@ export default function RecordPage() {
   const [result, setResult] = useState<LLMOutput | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
 
   const isOther = templateId === "other";
 
@@ -25,8 +32,6 @@ export default function RecordPage() {
     setError(null);
     setResult(null);
 
-    // For the "Other" template, prepend the user's document description
-    // so the LLM knows what structure to produce.
     const finalTranscript = isOther
       ? `Document type requested: ${otherDescription.trim() || "general professional document"}\n\nTranscript:\n${transcript}`
       : transcript;
@@ -37,14 +42,11 @@ export default function RecordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript: finalTranscript, templateId }),
       });
-
       const json: GenerateResponse = await res.json();
-
       if (!json.success) {
         setError(json.error.message);
         return;
       }
-
       setResult(json.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -55,19 +57,15 @@ export default function RecordPage() {
 
   const transcriptReady = transcript.trim().length >= 20;
   const otherReady = !isOther || otherDescription.trim().length >= 3;
-  const canGenerate = transcriptReady && otherReady && !loading;
+  const canGenerate = transcriptReady && otherReady && !loading && !transcribing;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">DictaDoc</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        Speak once, get the document you need.
-      </p>
+      <p className="mt-1 text-sm text-gray-600">Speak once, get the document you need.</p>
 
       <div className="mt-6">
-        <label className="block text-sm font-medium text-gray-700">
-          Document type
-        </label>
+        <label className="block text-sm font-medium text-gray-700">Document type</label>
         <select
           value={templateId}
           onChange={(e) => setTemplateId(e.target.value)}
@@ -76,37 +74,27 @@ export default function RecordPage() {
           {GROUPS.professional.length > 0 && (
             <optgroup label="Professional">
               {GROUPS.professional.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
+                <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </optgroup>
           )}
           {GROUPS["life-admin"].length > 0 && (
             <optgroup label="Life Admin">
               {GROUPS["life-admin"].map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
+                <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </optgroup>
           )}
           {GROUPS.creator.length > 0 && (
             <optgroup label="Creator">
-              {GROUPS.creator
-                .filter((t) => t.id !== "other")
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
+              {GROUPS.creator.filter((t) => t.id !== "other").map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </optgroup>
           )}
           <optgroup label="Not listed?">
             {TEMPLATES.filter((t) => t.id === "other").map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
+              <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </optgroup>
         </select>
@@ -127,22 +115,26 @@ export default function RecordPage() {
             placeholder="e.g. Resignation letter, meeting minutes, birthday toast"
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Describe the document. The AI will structure it appropriately.
-          </p>
         </div>
       )}
 
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700">
-          Transcript
-        </label>
+        <label className="block text-sm font-medium text-gray-700">Transcript</label>
+
+        <AudioRecorder
+          onTranscription={(text) =>
+            setTranscript((prev) => (prev ? prev + "\n\n" + text : text))
+          }
+          onError={setError}
+          onBusyChange={setTranscribing}
+        />
+
         <textarea
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
           rows={8}
-          placeholder="Paste or type the transcript here. In a later version, this will be filled by voice recording."
-          className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+          placeholder="Record audio above, or paste/type the transcript here."
+          className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
         />
         <p className="mt-1 text-xs text-gray-500">
           {transcript.trim().length} characters (min 20)
@@ -165,21 +157,15 @@ export default function RecordPage() {
 
       {result && (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {result.metadata.title}
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">{result.metadata.title}</h2>
           {result.metadata.subject && (
             <p className="text-sm text-gray-600">{result.metadata.subject}</p>
           )}
           <div className="mt-4 space-y-4">
             {result.sections.map((section, i) => (
               <div key={i}>
-                <h3 className="text-sm font-semibold text-gray-800">
-                  {section.heading}
-                </h3>
-                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
-                  {section.body}
-                </p>
+                <h3 className="text-sm font-semibold text-gray-800">{section.heading}</h3>
+                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{section.body}</p>
               </div>
             ))}
           </div>
