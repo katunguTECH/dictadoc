@@ -4,11 +4,19 @@ import type { Template } from "@/types/document";
 import { homeCareVisitTemplate } from "./home-care-visit";
 import { legalClientMemoTemplate } from "./legal-client-memo";
 import { insuranceClaimTemplate } from "./insurance-claim";
+import { realEstateShowingTemplate } from "./real-estate-showing";
+import { coachingSessionTemplate } from "./coaching-session";
+import { clientProgressSummaryTemplate } from "./client-progress-summary";
+import { consultancyEngagementTemplate } from "./consultancy-engagement";
 
 export const TEMPLATES: Template[] = [
   homeCareVisitTemplate,
   legalClientMemoTemplate,
   insuranceClaimTemplate,
+  realEstateShowingTemplate,
+  coachingSessionTemplate,
+  clientProgressSummaryTemplate,
+  consultancyEngagementTemplate,
 ];
 
 export function getTemplateById(id: string): Template | undefined {
