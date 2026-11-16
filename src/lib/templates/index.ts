@@ -8,6 +8,10 @@ import { realEstateShowingTemplate } from "./real-estate-showing";
 import { coachingSessionTemplate } from "./coaching-session";
 import { clientProgressSummaryTemplate } from "./client-progress-summary";
 import { consultancyEngagementTemplate } from "./consultancy-engagement";
+import { siteInspectionTemplate } from "./site-inspection";
+import { rentalChecklistTemplate } from "./rental-checklist";
+import { medicalVisitTemplate } from "./medical-visit";
+import { expenseReportTemplate } from "./expense-report";
 
 export const TEMPLATES: Template[] = [
   homeCareVisitTemplate,
@@ -17,6 +21,10 @@ export const TEMPLATES: Template[] = [
   coachingSessionTemplate,
   clientProgressSummaryTemplate,
   consultancyEngagementTemplate,
+  siteInspectionTemplate,
+  rentalChecklistTemplate,
+  medicalVisitTemplate,
+  expenseReportTemplate,
 ];
 
 export function getTemplateById(id: string): Template | undefined {
