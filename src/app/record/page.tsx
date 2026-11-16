@@ -1,30 +1,41 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { TEMPLATES } from "@/lib/templates";
+import { TEMPLATES, getTemplatesByCategory } from "@/lib/templates";
 import type { LLMOutput } from "@/types/llm-output";
 
 type GenerateResponse =
   | { success: true; data: LLMOutput }
   | { success: false; error: { kind: string; message: string } };
 
+const GROUPS = getTemplatesByCategory();
+
 export default function RecordPage() {
   const [transcript, setTranscript] = useState("");
   const [templateId, setTemplateId] = useState(TEMPLATES[0]?.id ?? "");
+  const [otherDescription, setOtherDescription] = useState("");
   const [result, setResult] = useState<LLMOutput | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isOther = templateId === "other";
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     setResult(null);
 
+    // For the "Other" template, prepend the user's document description
+    // so the LLM knows what structure to produce.
+    const finalTranscript = isOther
+      ? `Document type requested: ${otherDescription.trim() || "general professional document"}\n\nTranscript:\n${transcript}`
+      : transcript;
+
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript, templateId }),
+        body: JSON.stringify({ transcript: finalTranscript, templateId }),
       });
 
       const json: GenerateResponse = await res.json();
@@ -42,7 +53,9 @@ export default function RecordPage() {
     }
   }
 
-  const canGenerate = transcript.trim().length >= 20 && !loading;
+  const transcriptReady = transcript.trim().length >= 20;
+  const otherReady = !isOther || otherDescription.trim().length >= 3;
+  const canGenerate = transcriptReady && otherReady && !loading;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
@@ -60,13 +73,65 @@ export default function RecordPage() {
           onChange={(e) => setTemplateId(e.target.value)}
           className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
         >
-          {TEMPLATES.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
+          {GROUPS.professional.length > 0 && (
+            <optgroup label="Professional">
+              {GROUPS.professional.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {GROUPS["life-admin"].length > 0 && (
+            <optgroup label="Life Admin">
+              {GROUPS["life-admin"].map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {GROUPS.creator.length > 0 && (
+            <optgroup label="Creator">
+              {GROUPS.creator
+                .filter((t) => t.id !== "other")
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+            </optgroup>
+          )}
+          <optgroup label="Not listed?">
+            {TEMPLATES.filter((t) => t.id === "other").map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </optgroup>
         </select>
+        <p className="mt-1 text-xs text-gray-500">
+          {TEMPLATES.find((t) => t.id === templateId)?.description}
+        </p>
       </div>
+
+      {isOther && (
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-gray-700">
+            What kind of document do you need?
+          </label>
+          <input
+            type="text"
+            value={otherDescription}
+            onChange={(e) => setOtherDescription(e.target.value)}
+            placeholder="e.g. Resignation letter, meeting minutes, birthday toast"
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Describe the document. The AI will structure it appropriately.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4">
         <label className="block text-sm font-medium text-gray-700">
